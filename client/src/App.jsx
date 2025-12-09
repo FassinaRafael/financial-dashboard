@@ -32,6 +32,14 @@ const socket = io(SOCKET_URL, {
   reconnectionDelay: 1000,
 });
 
+/**
+ * Main application component that displays the cryptocurrency dashboard.
+ * Manages the state for real-time data, chart history, theme, and selected coin.
+ * Connects to the backend via Socket.io to receive updates.
+ *
+ * @component
+ * @returns {JSX.Element} The rendered component.
+ */
 function App() {
   const [currentData, setCurrentData] = useState(null);
   const [isConnected, setIsConnected] = useState(socket.connected);
@@ -319,6 +327,21 @@ function App() {
   );
 }
 
+/**
+ * Card component to display cryptocurrency statistics.
+ *
+ * @component
+ * @param {Object} props - The component props.
+ * @param {string} props.title - The name of the cryptocurrency (e.g., "Bitcoin").
+ * @param {string} props.symbol - The symbol of the cryptocurrency (e.g., "BTC").
+ * @param {number} props.price - The current price of the cryptocurrency in USD.
+ * @param {number} props.change - The 24-hour price change percentage.
+ * @param {Object} props.theme - The current theme object (containing colors for bg, text, card, etc.).
+ * @param {boolean} props.isActive - Whether this card is currently selected/active.
+ * @param {function} props.onClick - Handler function called when the card is clicked.
+ * @param {string} props.accentColor - The accent color associated with the cryptocurrency.
+ * @returns {JSX.Element} The rendered card component.
+ */
 const Card = ({
   title,
   symbol,

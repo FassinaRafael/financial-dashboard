@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Main server entry point.
+ * Sets up an Express server with Socket.io to fetch and broadcast cryptocurrency data.
+ */
+
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -20,6 +25,14 @@ const io = new Server(server, {
 // --- VARIÁVEL DE CACHE (MEMÓRIA DO SERVIDOR) ---
 let lastCachedData = null;
 
+/**
+ * Fetches current cryptocurrency data from the CoinGecko API.
+ *
+ * @async
+ * @function getCryptoData
+ * @returns {Promise<Object|null>} A promise that resolves to the cryptocurrency data object
+ * (containing prices and 24h change for bitcoin, ethereum, and solana) or null if the request fails.
+ */
 async function getCryptoData() {
   try {
     const response = await axios.get(
