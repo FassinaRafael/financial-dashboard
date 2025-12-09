@@ -18,38 +18,34 @@ const io = new Server(server, {
 
 let lastCachedData = null;
 
-// --- NOVA LÓGICA: API DA BINANCE (Mais rápida e estável) ---
+// --- NOVA ESTRATÉGIA: COINCAP API (Funciona nos EUA/Render) ---
 async function getCryptoData() {
   try {
-    // Busca dados de ticker 24h para BTC, ETH e SOL de uma vez
+    // Busca Bitcoin, Ethereum e Solana
     const response = await axios.get(
-      'https://api.binance.com/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT","SOLUSDT"]'
+      "https://api.coincap.io/v2/assets?ids=bitcoin,ethereum,solana"
     );
 
-    const rawData = response.data;
+    const rawData = response.data.data;
 
-    // ADAPTER: Transforma o formato da Binance no formato que seu Frontend espera (CoinGecko style)
-    // Binance retorna Array, nós transformamos em Objeto.
+    // ADAPTER: Transforma CoinCap Array -> Formato CoinGecko (Frontend)
     const formattedData = {};
 
     rawData.forEach((item) => {
-      // Mapeia os símbolos da Binance para os nomes do seu app
-      let name = "";
-      if (item.symbol === "BTCUSDT") name = "bitcoin";
-      if (item.symbol === "ETHUSDT") name = "ethereum";
-      if (item.symbol === "SOLUSDT") name = "solana";
+      // CoinCap usa IDs: 'bitcoin', 'ethereum', 'solana'
+      const name = item.id;
 
       if (name) {
         formattedData[name] = {
-          usd: parseFloat(item.lastPrice), // Preço atual
-          usd_24h_change: parseFloat(item.priceChangePercent), // Variação %
+          usd: parseFloat(item.priceUsd), // Preço
+          usd_24h_change: parseFloat(item.changePercent24Hr), // Variação
         };
       }
     });
 
     return formattedData;
   } catch (error) {
-    console.error("Erro na API Binance:", error.message);
+    console.error("Erro na API CoinCap:", error.message);
     return null;
   }
 }
@@ -61,17 +57,16 @@ io.on("connection", (socket) => {
   }
 });
 
-// Agora podemos voltar a atualizar RÁPIDO! 🚀
-// A Binance aguenta tranquilamente a cada 5 ou 10 segundos.
+// Intervalo rápido de 10 segundos (CoinCap aguenta tranquilamente)
 setInterval(async () => {
   const data = await getCryptoData();
 
   if (data) {
     lastCachedData = data;
     io.emit("crypto-update", data);
-    console.log("Dados Binance enviados:", new Date().toLocaleTimeString());
+    console.log("Dados CoinCap enviados:", new Date().toLocaleTimeString());
   }
-}, 10000); // 10 segundos (Muito mais fluido que 60s)
+}, 10000);
 
 // Inicialização
 getCryptoData().then((data) => {
@@ -80,5 +75,5 @@ getCryptoData().then((data) => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`🚀 Servidor (Binance Mode) rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor (CoinCap Mode) rodando na porta ${PORT}`);
 });
