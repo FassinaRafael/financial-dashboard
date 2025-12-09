@@ -9,60 +9,76 @@ app.use(cors());
 
 const server = http.createServer(app);
 
-// Configuração do Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "*", // Permite conexões de qualquer lugar (Vercel)
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
 
-// --- VARIÁVEL DE CACHE (MEMÓRIA DO SERVIDOR) ---
 let lastCachedData = null;
 
+// --- NOVA LÓGICA: API DA BINANCE (Mais rápida e estável) ---
 async function getCryptoData() {
   try {
+    // Busca dados de ticker 24h para BTC, ETH e SOL de uma vez
     const response = await axios.get(
-      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true"
+      'https://api.binance.com/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT","SOLUSDT"]'
     );
-    return response.data;
+
+    const rawData = response.data;
+
+    // ADAPTER: Transforma o formato da Binance no formato que seu Frontend espera (CoinGecko style)
+    // Binance retorna Array, nós transformamos em Objeto.
+    const formattedData = {};
+
+    rawData.forEach((item) => {
+      // Mapeia os símbolos da Binance para os nomes do seu app
+      let name = "";
+      if (item.symbol === "BTCUSDT") name = "bitcoin";
+      if (item.symbol === "ETHUSDT") name = "ethereum";
+      if (item.symbol === "SOLUSDT") name = "solana";
+
+      if (name) {
+        formattedData[name] = {
+          usd: parseFloat(item.lastPrice), // Preço atual
+          usd_24h_change: parseFloat(item.priceChangePercent), // Variação %
+        };
+      }
+    });
+
+    return formattedData;
   } catch (error) {
-    console.error("Erro na API (provável 429):", error.message);
+    console.error("Erro na API Binance:", error.message);
     return null;
   }
 }
 
 io.on("connection", (socket) => {
   console.log(`✅ Usuário conectado: ${socket.id}`);
-
   if (lastCachedData) {
     socket.emit("crypto-update", lastCachedData);
   }
-
-  socket.on("disconnect", () => {
-    console.log("Usuário desconectou");
-  });
 });
 
+// Agora podemos voltar a atualizar RÁPIDO! 🚀
+// A Binance aguenta tranquilamente a cada 5 ou 10 segundos.
 setInterval(async () => {
   const data = await getCryptoData();
 
   if (data) {
     lastCachedData = data;
     io.emit("crypto-update", data);
-    console.log(
-      "Dados atualizados (Broadcast):",
-      new Date().toLocaleTimeString()
-    );
+    console.log("Dados Binance enviados:", new Date().toLocaleTimeString());
   }
-}, 60000);
+}, 10000); // 10 segundos (Muito mais fluido que 60s)
 
-// Primeira busca ao iniciar o servidor (para não esperar 60s)
+// Inicialização
 getCryptoData().then((data) => {
   if (data) lastCachedData = data;
 });
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor (Binance Mode) rodando na porta ${PORT}`);
 });
