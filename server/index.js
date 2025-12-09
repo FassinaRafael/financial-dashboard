@@ -5,21 +5,21 @@ const cors = require("cors");
 const axios = require("axios");
 
 const app = express();
-
-// 1. Configuração do CORS
 app.use(cors());
 
 const server = http.createServer(app);
 
-// 2. Configuração do Socket.io
+// Configuração do Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "*", // Permite conexões de qualquer lugar (Vercel)
     methods: ["GET", "POST"],
   },
 });
 
-// 3. Lógica para buscar dados (Bitcoin e Ethereum)
+// --- VARIÁVEL DE CACHE (MEMÓRIA DO SERVIDOR) ---
+let lastCachedData = null;
+
 async function getCryptoData() {
   try {
     const response = await axios.get(
@@ -27,36 +27,42 @@ async function getCryptoData() {
     );
     return response.data;
   } catch (error) {
-    console.error("Erro ao buscar dados da API:", error.message);
+    console.error("Erro na API (provável 429):", error.message);
     return null;
   }
 }
 
-// 4. O Ciclo de Vida do Socket
 io.on("connection", (socket) => {
-  console.log(`Usuário conectado: ${socket.id}`);
+  console.log(`✅ Usuário conectado: ${socket.id}`);
 
-  getCryptoData().then((data) => {
-    if (data) socket.emit("crypto-update", data);
-  });
+  if (lastCachedData) {
+    socket.emit("crypto-update", lastCachedData);
+  }
 
   socket.on("disconnect", () => {
     console.log("Usuário desconectou");
   });
 });
 
-// 5. Automação: Buscar dados a cada 10 segundos
 setInterval(async () => {
   const data = await getCryptoData();
+
   if (data) {
-    // 'broadcast' envia para TODOS os conectados
+    lastCachedData = data;
     io.emit("crypto-update", data);
+    console.log(
+      "Dados atualizados (Broadcast):",
+      new Date().toLocaleTimeString()
+    );
   }
-}, 20000);
+}, 60000);
 
-// 6. Iniciar o servidor
+// Primeira busca ao iniciar o servidor (para não esperar 60s)
+getCryptoData().then((data) => {
+  if (data) lastCachedData = data;
+});
+
 const PORT = process.env.PORT || 3001;
-
 server.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
