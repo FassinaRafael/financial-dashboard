@@ -18,34 +18,36 @@ const io = new Server(server, {
 
 let lastCachedData = null;
 
-// --- NOVA ESTRATÉGIA: COINCAP API (Funciona nos EUA/Render) ---
+// --- ESTRATÉGIA FINAL: BINANCE.US (Servidores Americanos) ---
 async function getCryptoData() {
   try {
-    // Busca Bitcoin, Ethereum e Solana
+    // Usamos a API .US que é permitida no Render
+    // Nota: A Binance US usa symbols um pouco diferentes as vezes, mas BTCUSDT padrão funciona
     const response = await axios.get(
-      "https://api.coincap.io/v2/assets?ids=bitcoin,ethereum,solana"
+      'https://api.binance.us/api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT","SOLUSDT"]'
     );
 
-    const rawData = response.data.data;
+    const rawData = response.data;
 
-    // ADAPTER: Transforma CoinCap Array -> Formato CoinGecko (Frontend)
     const formattedData = {};
 
     rawData.forEach((item) => {
-      // CoinCap usa IDs: 'bitcoin', 'ethereum', 'solana'
-      const name = item.id;
+      let name = "";
+      if (item.symbol === "BTCUSDT") name = "bitcoin";
+      if (item.symbol === "ETHUSDT") name = "ethereum";
+      if (item.symbol === "SOLUSDT") name = "solana";
 
       if (name) {
         formattedData[name] = {
-          usd: parseFloat(item.priceUsd), // Preço
-          usd_24h_change: parseFloat(item.changePercent24Hr), // Variação
+          usd: parseFloat(item.lastPrice),
+          usd_24h_change: parseFloat(item.priceChangePercent),
         };
       }
     });
 
     return formattedData;
   } catch (error) {
-    console.error("Erro na API CoinCap:", error.message);
+    console.error("Erro na API Binance US:", error.message);
     return null;
   }
 }
@@ -57,14 +59,14 @@ io.on("connection", (socket) => {
   }
 });
 
-// Intervalo rápido de 10 segundos (CoinCap aguenta tranquilamente)
+// Intervalo de 10 segundos (Rápido e Seguro)
 setInterval(async () => {
   const data = await getCryptoData();
 
   if (data) {
     lastCachedData = data;
     io.emit("crypto-update", data);
-    console.log("Dados CoinCap enviados:", new Date().toLocaleTimeString());
+    console.log("Dados Binance US enviados:", new Date().toLocaleTimeString());
   }
 }, 10000);
 
@@ -75,5 +77,5 @@ getCryptoData().then((data) => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`🚀 Servidor (CoinCap Mode) rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor (Binance US Mode) rodando na porta ${PORT}`);
 });
